@@ -16,8 +16,8 @@ public class WebViewActivity extends Activity implements
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.fragment_main);
 
-		web = (WebView) findViewById(R.id.web);
-		web.setWebViewClient(new WebClientWithLoading(this));
+		web = (WebView) findViewById(R.id.webview);
+		web.setWebViewClient(new WebClientWithLoading(this, this));
 		Intent i = getIntent();
 		String url = i.getStringExtra(KEY_URL);
 		web.loadUrl(url);

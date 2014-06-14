@@ -7,6 +7,8 @@ import android.webkit.WebView;
 
 public class WebViewWithPullRefresh extends WebView {
 
+	private PullRefreshCallback callback = null;
+
 	public WebViewWithPullRefresh(Context context) {
 		super(context);
 		// TODO Auto-generated constructor stub
@@ -26,12 +28,24 @@ public class WebViewWithPullRefresh extends WebView {
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
 		// TODO Auto-generated method stub
-
-		return super.onTouchEvent(event);
+		boolean intercepted = false;
+		if (null != callback) {
+			intercepted = callback.consumeMotionEvent(event);
+		}
+		intercepted = intercepted ? intercepted : super.onTouchEvent(event);
+		return intercepted;
 	}
 
-	public interface PullRefreshInterface {
-		public boolean consumeMotionEvent(MotionEvent now, MotionEvent last);
+	public PullRefreshCallback getCallback() {
+		return callback;
+	}
+
+	public void setCallback(PullRefreshCallback callback) {
+		this.callback = callback;
+	}
+
+	public interface PullRefreshCallback {
+		public boolean consumeMotionEvent(MotionEvent event);
 	}
 
 }

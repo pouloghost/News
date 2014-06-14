@@ -3,6 +3,7 @@ package gt.web.news;
 import gt.web.model.DBManager;
 import gt.web.model.Favorite;
 import gt.web.model.FavoriteUtils;
+import gt.web.news.WebViewWithPullRefresh.PullRefreshCallback;
 import gt.web.push.PushActivity;
 import gt.web.update.UpdateManager;
 
@@ -26,15 +27,21 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.MeasureSpec;
+import android.view.ViewGroup;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends ActionBarActivity implements
@@ -47,8 +54,9 @@ public class MainActivity extends ActionBarActivity implements
 	 */
 	private static final String SEARCH = "http://m.baidu.com/s?wd=";
 
-	private WebView web = null;
+	private WebViewWithPullRefresh web = null;
 	private WebClientWithLoading client = null;
+	private TextView refreshHint = null;
 	private NavigationDrawerFragment mNavigationDrawerFragment;
 	private DBManager dbmanager = null;
 	/**
@@ -60,7 +68,6 @@ public class MainActivity extends ActionBarActivity implements
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-
 		new AsyncTask<Void, Integer, Void>() {
 
 			@Override
@@ -77,16 +84,114 @@ public class MainActivity extends ActionBarActivity implements
 		mNavigationDrawerFragment = (NavigationDrawerFragment) getSupportFragmentManager()
 				.findFragmentById(R.id.navigation_drawer);
 		mTitle = getTitle();
-
+		refreshHint = (TextView) findViewById(R.id.refresh_hint);
+		hideHint();
 		// Set up the drawer.
+
 		mNavigationDrawerFragment.setUp(R.id.navigation_drawer,
 				(DrawerLayout) findViewById(R.id.drawer_layout));
 		setupWebView();
 		mNavigationDrawerFragment.showHomepage();
 	}
 
+	private void showPullHint() {
+		refreshHint.setVisibility(View.VISIBLE);
+		refreshHint.setHeight(0);
+		// int y = height;
+		// layout.invalidate();
+		// layout.scrollBy(0, y);
+		// Log.i("GT", y + " y");
+	}
+
+	private void scrollHint(int y) {
+		y = y < 0 ? 0 : y;
+		refreshHint.setHeight(y);
+		// int off = height - y;
+		// off = off < 0 ? 0 : off;
+		// layout.scrollTo(0, off);
+		// Log.i("GT", off + " off");
+	}
+
+	private void showRefresh() {
+		refreshHint.setText(R.string.refresh_hint);
+	}
+
+	private void showPull() {
+		refreshHint.setText(R.string.pull_hint);
+	}
+
+	private void hideHint() {
+		showPull();
+		refreshHint.setHeight(0);
+	}
+
 	private void setupWebView() {
-		web = (WebView) findViewById(R.id.web);
+		web = (WebViewWithPullRefresh) findViewById(R.id.web);
+		web.setCallback(new PullRefreshCallback() {
+			private MotionEvent down = null;
+			private boolean inMotion = false;
+			private boolean refresh = false;
+
+			private static final int SLOP = 50;
+			private static final int THRESHOLD = 100;
+
+			private void clean() {
+				inMotion = false;
+				down = null;
+				refresh = false;
+				hideHint();
+			}
+
+			@Override
+			public boolean consumeMotionEvent(MotionEvent event) {
+				// TODO Auto-generated method stub
+				int scrollY = web.getScrollY();
+				switch (event.getAction()) {
+				case MotionEvent.ACTION_DOWN:
+					clean();
+					if (0 == scrollY) {
+						down = event;
+					}
+					break;
+				case MotionEvent.ACTION_MOVE:
+					if (null != down) {
+						float lastY = down.getRawY();
+						float y = event.getRawY();
+						if (y - lastY > SLOP || inMotion) {
+							// Log.i("GT", (y - lastY) / height + "  " + y);
+							refresh = y - lastY > THRESHOLD;
+							if (refresh) {
+								showRefresh();
+							} else {
+								showPull();
+							}
+							if (inMotion) {
+								scrollHint((int) (y - lastY));
+							} else {
+								showPullHint();
+							}
+							inMotion = true;
+							return true;
+						}
+					}
+					break;
+				case MotionEvent.ACTION_CANCEL:
+				case MotionEvent.ACTION_UP:
+					boolean consumed = false;
+					if (null != down) {
+						float lastY = down.getY();
+						float y = event.getY();
+						if (refresh) {
+							web.reload();
+							consumed = true;
+						}
+					}
+					clean();
+					return consumed;
+				}
+				return false;
+			}
+		});
 		client = new WebClientWithLoading(this, this);
 		web.setWebViewClient(client);
 
@@ -440,9 +545,17 @@ public class MainActivity extends ActionBarActivity implements
 	@Override
 	public boolean onNewURL(WebView view, String url) {
 		// TODO Auto-generated method stub
-		Intent i = new Intent(MainActivity.this, WebViewActivity.class);
-		i.putExtra(WebViewActivity.KEY_URL, url);
-		startActivity(i);
-		return true;
+		final String u = url;
+		new Handler(getMainLooper()).postAtFrontOfQueue(new Runnable() {
+
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				Intent i = new Intent(MainActivity.this, WebViewActivity.class);
+				i.putExtra(WebViewActivity.KEY_URL, u);
+				MainActivity.this.startActivity(i);
+			}
+		});
+		return false;
 	}
 }

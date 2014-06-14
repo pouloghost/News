@@ -9,6 +9,7 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -39,12 +40,13 @@ public class WebClientWithLoading extends WebViewClient {
 		// TODO Auto-generated method stub
 		boolean handled = false;
 		if (null != callbacks) {
+			Log.i("GT", Thread.currentThread().getId() + " client");
 			handled = callbacks.onNewURL(view, url);
 			view.goBack();
 		}
 		if (!handled) {
-			if (url.startsWith("http")) {// this site
-				System.out.println("load " + url);
+			if (true) {// this site
+				Log.i("GT", "load " + url);
 				view.loadUrl(url);
 				handled = true;
 			}
